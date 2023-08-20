@@ -1,0 +1,57 @@
+<html>
+<link rel="stylesheet" href="/static/styles.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<head>
+    <script type="text/javascript" src="/static/register_service_worker.js">
+    </script>
+    <script type="text/javascript">
+        registerServiceWorker(
+            "/static/service_worker.js",
+            "{{config['VAPID_PUBLIC_KEY']}}",
+            "/api/push-subscriptions"
+        );
+    </script>
+</head>
+
+<body>
+    <div class="card">
+
+        <h1>
+            Ringer
+        </h1>
+        <img id="picture" />
+        <button class="button" onclick="testNotifications()">Test</button>
+        <button class="button" onclick="window.location.href='/galerie';">Istoric</button>
+        <span class="subtle">
+            Last action: {{ lastTimestamp }}
+        </span>
+    </div>
+
+</body>
+<script type="text/javascript">
+
+    function testNotifications() {
+        fetch("/api/notifTest")
+    }
+
+    function pictureUpdate() {
+        let doc = document.getElementById("picture");
+        fetch("/api/picture")
+            .then((response) => response.blob())
+            .then((imageBlob) => doc.src = URL.createObjectURL(imageBlob))
+    }
+
+    function update() {
+        pictureUpdate();
+    }
+
+    (function () {
+        update();
+        setInterval(function () {
+            update();
+        }, 5000);
+    })();
+</script>
+
+</html>
