@@ -1,5 +1,5 @@
 import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, Response, render_template, request, jsonify
 from picamera import PiCamera
 
 import threading
@@ -19,6 +19,9 @@ global count
 data = {"name": "eu", "count": 0}
 
 camera = PiCamera()
+camera.resolution = (640, 480)
+camera.framerate = 24
+
 app = Flask(__name__, instance_relative_config=True)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite://"
 app.config.from_pyfile("/home/quincy/Licenta/application.cfg.py")
@@ -33,8 +36,28 @@ class PushSubscription(db.Model):
 
 with app.app_context():
     db.create_all()
+# -----------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 
 
+def gen(camera):
+    time.sleep(0.1)  # wait for the camera to warm up
+    while True:
+        frame = ""
+        camera.capture(frame, format="jpeg", use_video_port=True)
+        yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+
+
+# Define the route that will stream the video
+@app.route("/video_feed")
+def video_feed():
+    return Response(gen(camera), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+
+# -----------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 @app.route("/api/push-subscriptions", methods=["POST"])
 def create_push_subscription():
     json_data = request.get_json()
@@ -75,6 +98,7 @@ def notifTest():
             subscriptions,
             "Test notification",
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras quis sapien in sem vestibulum fringilla ac non quam. Nunc auctor vitae sem eget scelerisque. Pellentesque in lacinia neque. In fringilla molestie imperdiet. Morbi varius in felis vitae accumsan. Aenean et luctus leo. Vivamus nibh tellus, euismod nec massa in, dapibus imperdiet eros. Phasellus volutpat eleifend auctor. Sed dapibus ut quam in molestie.",
+            "../static/photos/0.jpg",
         )
     return {"results": results}
 
@@ -112,18 +136,18 @@ def buttonListen():
                     subscriptions,
                     "Ring!",
                     "E cineva la ușă!",
-                    "/static" + str(count) + ".jpg",
+                    "../static/photos/" + str(count) + ".jpg",
                 )
 
 
-@app.route("/admin-api/trigger-push-notifications", methods=["POST"])
-def trigger_push_notifications():
-    json_data = request.get_json()
-    subscriptions = PushSubscription.query.all()
-    results = trigger_push_notifications_for_subscriptions(
-        subscriptions, json_data.get("title"), json_data.get("body")
-    )
-    return jsonify({"status": "success", "result": results})
+# @app.route("/admin-api/trigger-push-notifications", methods=["POST"])
+# def trigger_push_notifications():
+#     json_data = request.get_json()
+#     subscriptions = PushSubscription.query.all()
+#     results = trigger_push_notifications_for_subscriptions(
+#         subscriptions, json_data.get("title"), json_data.get("body")
+#     )
+#     return jsonify({"status": "success", "result": results})
 
 
 if __name__ == "__main__":
